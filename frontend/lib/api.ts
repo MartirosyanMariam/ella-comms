@@ -22,6 +22,8 @@ export interface Rule {
   trigger_type: "standard" | "advanced";
   trigger_event?: string | null;
   trigger_query?: string | null;
+  condition_type: "standard" | "advanced";
+  condition_query?: string | null;
   conditions: Condition[];
   delay_days: number;
   channels: ChannelContent[];
@@ -57,6 +59,11 @@ export const api = {
     request<void>(`/rules/${id}`, { method: "DELETE" }),
   testQuery: (sql: string) =>
     request<{ count: number; error: string | null }>("/rules/test-query", {
+      method: "POST",
+      body: JSON.stringify({ sql }),
+    }),
+  testConditionQuery: (sql: string) =>
+    request<{ count: number; error: string | null }>("/rules/test-condition-query", {
       method: "POST",
       body: JSON.stringify({ sql }),
     }),

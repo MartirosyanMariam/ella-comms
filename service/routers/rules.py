@@ -61,3 +61,9 @@ class TestQueryRequest(BaseModel):
 async def test_query(body: TestQueryRequest):
     result = await evaluator.test_query(body.sql)
     return result
+
+
+@router.post("/test-condition-query")
+async def test_condition_query(body: TestQueryRequest):
+    result = await evaluator.test_condition_query(body.sql)
+    return result

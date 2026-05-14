@@ -1,87 +1,186 @@
 "use client";
-import { Trash2, Plus } from "lucide-react";
+import { useState } from "react";
+import { Trash2, Plus, AlertTriangle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CONDITION_FIELDS, CONDITION_OPERATORS, type Condition } from "@/lib/api";
+import { CONDITION_FIELDS, CONDITION_OPERATORS, api, type Condition } from "@/lib/api";
 
 interface Props {
+  conditionType: "standard" | "advanced";
+  conditionQuery: string;
   conditions: Condition[];
-  onChange: (conditions: Condition[]) => void;
+  onChange: (updates: {
+    conditionType?: "standard" | "advanced";
+    conditionQuery?: string;
+    conditions?: Condition[];
+  }) => void;
 }
 
-export function ConditionBuilder({ conditions, onChange }: Props) {
+export function ConditionBuilder({ conditionType, conditionQuery, conditions, onChange }: Props) {
+  const [testResult, setTestResult] = useState<{ count: number; error: string | null } | null>(null);
+  const [testing, setTesting] = useState(false);
+
   function addCondition() {
-    onChange([...conditions, { field: "target_language", operator: "eq", value: "" }]);
+    onChange({ conditions: [...conditions, { field: "target_language", operator: "eq", value: "" }] });
   }
 
   function updateCondition(index: number, updates: Partial<Condition>) {
-    onChange(conditions.map((c, i) => (i === index ? { ...c, ...updates } : c)));
+    onChange({ conditions: conditions.map((c, i) => (i === index ? { ...c, ...updates } : c)) });
   }
 
   function removeCondition(index: number) {
-    onChange(conditions.filter((_, i) => i !== index));
+    onChange({ conditions: conditions.filter((_, i) => i !== index) });
+  }
+
+  async function handleTest() {
+    if (!conditionQuery.trim()) return;
+    setTesting(true);
+    try {
+      const result = await api.testConditionQuery(conditionQuery);
+      setTestResult(result);
+    } catch {
+      setTestResult({ count: 0, error: "Request failed" });
+    } finally {
+      setTesting(false);
+    }
   }
 
   return (
-    <div className="space-y-3">
-      {conditions.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          No conditions — rule applies to all matched users.
-        </p>
-      )}
-      {conditions.map((cond, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <Select value={cond.field} onValueChange={(v) => updateCondition(i, { field: v })}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CONDITION_FIELDS.map((f) => (
-                <SelectItem key={f.value} value={f.value}>
-                  {f.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="space-y-4">
+      {/* Mode toggle */}
+      <div className="flex items-center gap-3">
+        <Switch
+          id="condition-advanced"
+          checked={conditionType === "advanced"}
+          onCheckedChange={(checked) => {
+            onChange({ conditionType: checked ? "advanced" : "standard" });
+            setTestResult(null);
+          }}
+        />
+        <Label htmlFor="condition-advanced" className="cursor-pointer">
+          Advanced mode (custom SQL WHERE clause)
+        </Label>
+      </div>
 
-          <Select
-            value={cond.operator}
-            onValueChange={(v) => updateCondition(i, { operator: v as Condition["operator"] })}
+      {conditionType === "standard" ? (
+        /* ── Standard row-based builder ── */
+        <div className="space-y-3">
+          {conditions.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No conditions — rule applies to all matched users.
+            </p>
+          )}
+          {conditions.map((cond, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Select value={cond.field} onValueChange={(v) => updateCondition(i, { field: v })}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONDITION_FIELDS.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={cond.operator}
+                onValueChange={(v) => updateCondition(i, { operator: v as Condition["operator"] })}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONDITION_OPERATORS.map((op) => (
+                    <SelectItem key={op.value} value={op.value}>
+                      {op.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Input
+                value={cond.value}
+                onChange={(e) => updateCondition(i, { value: e.target.value })}
+                placeholder="value"
+                className="flex-1"
+              />
+
+              <Button type="button" variant="ghost" size="icon" onClick={() => removeCondition(i)}>
+                <Trash2 className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addCondition}
+            className="flex items-center gap-1.5 text-sm text-primary hover:underline"
           >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CONDITION_OPERATORS.map((op) => (
-                <SelectItem key={op.value} value={op.value}>
-                  {op.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Input
-            value={cond.value}
-            onChange={(e) => updateCondition(i, { value: e.target.value })}
-            placeholder="value"
-            className="flex-1"
-          />
-
-          <Button type="button" variant="ghost" size="icon" onClick={() => removeCondition(i)}>
-            <Trash2 className="h-4 w-4 text-muted-foreground" />
-          </Button>
+            <Plus className="h-3.5 w-3.5" />
+            Add condition
+          </button>
         </div>
-      ))}
-
-      <button
-        type="button"
-        onClick={addCondition}
-        className="flex items-center gap-1.5 text-sm text-primary hover:underline"
-      >
-        <Plus className="h-3.5 w-3.5" />
-        Add condition
-      </button>
+      ) : (
+        /* ── Advanced SQL WHERE clause ── */
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Write a SQL <code className="bg-muted px-1 rounded">WHERE</code> clause that filters users from Ella's DB.
+            Reference the <code className="bg-muted px-1 rounded">users</code> table as{" "}
+            <code className="bg-muted px-1 rounded">u</code>. The clause is applied on top of the trigger result.
+          </p>
+          <div className="rounded-md bg-muted/40 border px-3 py-2 text-xs font-mono text-muted-foreground">
+            SELECT u.id FROM users u WHERE u.id = ANY(trigger_results) AND{" "}
+            <span className="text-foreground font-semibold">{"{ your clause }"}</span>
+          </div>
+          <Textarea
+            value={conditionQuery}
+            onChange={(e) => {
+              onChange({ conditionQuery: e.target.value });
+              setTestResult(null);
+            }}
+            placeholder={`u.target_language = 'French' AND u.country != 'US'`}
+            className="font-mono text-sm min-h-[100px]"
+          />
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleTest}
+              disabled={testing || !conditionQuery.trim()}
+            >
+              {testing ? "Testing…" : "Test clause"}
+            </Button>
+            {testResult && !testResult.error && (
+              <div className="flex items-center gap-1.5 text-sm">
+                {testResult.count === 0 ? (
+                  <>
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <span className="text-amber-700">Matches 0 users right now.</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-green-700">
+                      Matches {testResult.count} user{testResult.count !== 1 ? "s" : ""}.
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+            {testResult?.error && (
+              <span className="text-sm text-destructive">{testResult.error}</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

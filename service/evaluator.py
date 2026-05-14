@@ -132,8 +132,10 @@ async def evaluate(rule: Rule) -> AsyncIterator[tuple[str, ChannelContent]]:
     logger.info("rule %s: %d candidates from trigger", rule.id, len(candidate_ids))
 
     # 3. Apply conditions
-    filtered_ids = []
-    if rule.conditions:
+    if getattr(rule, "condition_type", "standard") == "advanced" and getattr(rule, "condition_query", None):
+        filtered_ids = await _apply_advanced_condition(candidate_ids, rule.condition_query)
+    elif rule.conditions:
+        filtered_ids = []
         for user_id in candidate_ids:
             if await _passes_conditions(user_id, rule.conditions):
                 filtered_ids.append(user_id)
@@ -189,11 +191,50 @@ async def _passes_conditions(user_id: str, conditions: list[Condition]) -> bool:
     return True
 
 
+async def _apply_advanced_condition(candidate_ids: list[str], condition_query: str) -> list[str]:
+    """
+    Filter candidate_ids using a SQL WHERE clause fragment.
+    The clause may reference the users table aliased as `u`.
+    """
+    if not candidate_ids:
+        return []
+    try:
+        async with ella_readonly_conn() as conn:
+            rows = await conn.fetch(
+                f"""
+                SELECT u.id::text AS user_id
+                FROM users u
+                WHERE u.id = ANY($1::uuid[])
+                  AND ({condition_query})
+                """,
+                candidate_ids,
+            )
+            return [r["user_id"] for r in rows]
+    except Exception as exc:
+        logger.error("advanced condition query failed: %s", exc)
+        return []
+
+
 async def test_query(sql: str) -> dict:
-    """Run an advanced query in read-only mode and return match count."""
+    """Run an advanced trigger query in read-only mode and return match count."""
     try:
         async with ella_readonly_conn() as conn:
             rows = await conn.fetch(f"SELECT user_id FROM ({sql}) sub")
+            return {"count": len(rows), "error": None}
+    except Exception as exc:
+        return {"count": 0, "error": str(exc)}
+
+
+async def test_condition_query(sql: str) -> dict:
+    """
+    Test an advanced condition WHERE clause against all users and return match count.
+    The clause may reference the users table aliased as `u`.
+    """
+    try:
+        async with ella_readonly_conn() as conn:
+            rows = await conn.fetch(
+                f"SELECT u.id FROM users u WHERE ({sql})"
+            )
             return {"count": len(rows), "error": None}
     except Exception as exc:
         return {"count": 0, "error": str(exc)}

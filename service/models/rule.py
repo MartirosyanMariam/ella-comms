@@ -26,6 +26,8 @@ class RuleBase(BaseModel):
     trigger_type: Literal["standard", "advanced"] = "standard"
     trigger_event: Optional[str] = None
     trigger_query: Optional[str] = None
+    condition_type: Literal["standard", "advanced"] = "standard"
+    condition_query: Optional[str] = None
     conditions: list[Condition] = Field(default_factory=list)
     delay_days: int = 0
     channels: list[ChannelContent] = Field(default_factory=list)

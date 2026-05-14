@@ -15,6 +15,8 @@ type FormState = {
   triggerType: "standard" | "advanced";
   triggerEvent: string;
   triggerQuery: string;
+  conditionType: "standard" | "advanced";
+  conditionQuery: string;
   conditions: Condition[];
   sendImmediately: boolean;
   delayDays: number;
@@ -28,6 +30,8 @@ function initialState(rule?: Rule): FormState {
     triggerType: rule?.trigger_type ?? "standard",
     triggerEvent: rule?.trigger_event ?? "",
     triggerQuery: rule?.trigger_query ?? "",
+    conditionType: rule?.condition_type ?? "standard",
+    conditionQuery: rule?.condition_query ?? "",
     conditions: rule?.conditions ?? [],
     sendImmediately: (rule?.delay_days ?? 0) === 0,
     delayDays: rule?.delay_days ?? 1,
@@ -56,7 +60,9 @@ function formToPayload(form: FormState, status: "draft" | "published"): RuleCrea
     trigger_type: form.triggerType,
     trigger_event: form.triggerType === "standard" ? form.triggerEvent : null,
     trigger_query: form.triggerType === "advanced" ? form.triggerQuery : null,
-    conditions: form.conditions,
+    condition_type: form.conditionType,
+    condition_query: form.conditionType === "advanced" ? form.conditionQuery : null,
+    conditions: form.conditionType === "standard" ? form.conditions : [],
     delay_days: form.sendImmediately ? 0 : form.delayDays,
     channels: form.channels,
     is_repeatable: form.isRepeatable,
@@ -142,8 +148,14 @@ export function RuleForm({ existingRule }: Props) {
       <section className="space-y-3">
         <h2 className="text-base font-semibold">Conditions <span className="text-muted-foreground font-normal text-sm">(optional)</span></h2>
         <ConditionBuilder
+          conditionType={form.conditionType}
+          conditionQuery={form.conditionQuery}
           conditions={form.conditions}
-          onChange={(c) => update({ conditions: c })}
+          onChange={(u) => update({
+            conditionType: u.conditionType ?? form.conditionType,
+            conditionQuery: u.conditionQuery ?? form.conditionQuery,
+            conditions: u.conditions ?? form.conditions,
+          })}
         />
       </section>
 
