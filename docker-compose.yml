@@ -65,8 +65,6 @@ services:
         condition: service_healthy
       mock-backend:
         condition: service_started
-    volumes:
-      - ./service:/app
 
   # ── Admin UI ─────────────────────────────────────────────────────────────────
 
@@ -80,10 +78,6 @@ services:
       - "3000:3000"
     depends_on:
       - service
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
 
 volumes:
   ella-mock-db-data:
