@@ -4,7 +4,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api, type SimulateResult, type Rule } from "@/lib/api";
-import { Bell, Smartphone, Mail, Users, AlertTriangle, CheckCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { Bell, Smartphone, Mail, AlertTriangle, CheckCircle, ChevronDown, ChevronRight, Send, Loader2 } from "lucide-react";
 
 const CHANNEL_ICON: Record<string, React.ReactNode> = {
   in_app: <Bell className="h-3.5 w-3.5" />,
@@ -57,15 +57,20 @@ interface Props {
   onClose: () => void;
 }
 
+type TriggerState = { sent: number; failed: number; errors: string[] } | null;
+
 export function SimulateDrawer({ rule, open, onClose }: Props) {
   const [result, setResult] = useState<SimulateResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [triggerResult, setTriggerResult] = useState<TriggerState>(null);
 
   async function runSimulation() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setTriggerResult(null);
     try {
       const r = await api.simulateRule(rule.id);
       setResult(r);
@@ -76,8 +81,17 @@ export function SimulateDrawer({ rule, open, onClose }: Props) {
     }
   }
 
-  function handleOpen() {
-    if (open && !result && !loading) runSimulation();
+  async function sendNow() {
+    setSending(true);
+    setTriggerResult(null);
+    try {
+      const r = await api.triggerRule(rule.id);
+      setTriggerResult(r);
+    } catch (e: unknown) {
+      setTriggerResult({ sent: 0, failed: 0, errors: [(e as Error).message] });
+    } finally {
+      setSending(false);
+    }
   }
 
   // Auto-run when drawer opens
@@ -169,14 +183,49 @@ export function SimulateDrawer({ rule, open, onClose }: Props) {
             </div>
           )}
 
+          {triggerResult && (
+            <div className={`rounded-md border px-4 py-3 text-sm ${
+              triggerResult.errors.length > 0
+                ? "bg-destructive/10 border-destructive/30 text-destructive"
+                : "bg-green-50 border-green-200 text-green-800"
+            }`}>
+              <p className="font-medium">
+                {triggerResult.errors.length === 0
+                  ? `Sent successfully — ${triggerResult.sent} notification${triggerResult.sent !== 1 ? "s" : ""} delivered`
+                  : `Finished with errors — ${triggerResult.sent} sent, ${triggerResult.failed} failed`}
+              </p>
+              {triggerResult.errors.length > 0 && (
+                <ul className="mt-1 space-y-0.5">
+                  {triggerResult.errors.map((e, i) => <li key={i} className="text-xs">{e}</li>)}
+                </ul>
+              )}
+              {triggerResult.sent > 0 && (
+                <p className="text-xs mt-1 opacity-70">Check the History tab to see the log entries.</p>
+              )}
+            </div>
+          )}
+
           <div className="pt-2 border-t flex justify-between items-center">
             <p className="text-xs text-muted-foreground">
               Rule status: <span className="font-medium capitalize">{result.rule_status}</span>
               {result.rule_status === "draft" && " — publish to enable scheduled sending"}
             </p>
-            <Button variant="outline" size="sm" onClick={runSimulation} disabled={loading}>
-              Re-run
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={runSimulation} disabled={loading || sending}>
+                Re-run
+              </Button>
+              <Button
+                size="sm"
+                onClick={sendNow}
+                disabled={sending || loading || result.unique_users_matched === 0}
+              >
+                {sending ? (
+                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Sending…</>
+                ) : (
+                  <><Send className="h-3.5 w-3.5 mr-1.5" />Send Now</>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       )}

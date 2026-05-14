@@ -77,3 +77,43 @@ async def simulate_rule(rule_id: UUID):
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
+
+
+@router.post("/{rule_id}/trigger")
+async def trigger_rule(rule_id: UUID):
+    """Immediately execute a rule, send notifications, and log results."""
+    from db.rules_db import get_rule as _get_rule
+    import evaluator as eval_module
+    import payload_builder
+    import sender
+    from db.rules_db import log_notification, update_last_run
+    from scheduler import _dict_to_rule
+
+    rule_dict = await _get_rule(rule_id)
+    if not rule_dict:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    rule = _dict_to_rule(rule_dict)
+    sent, failed, errors = 0, 0, []
+
+    async for user_id, channel_content in eval_module.evaluate(rule):
+        try:
+            payload = await payload_builder.build(rule, user_id, channel_content)
+            success, error = await sender.send(payload)
+            if success:
+                await log_notification(rule_id, user_id, channel_content.channel, "sent")
+                sent += 1
+            else:
+                await log_notification(rule_id, user_id, channel_content.channel, "failed", error)
+                failed += 1
+                errors.append(error or "send failed")
+        except Exception as exc:
+            try:
+                await log_notification(rule_id, user_id, channel_content.channel, "failed", str(exc))
+            except Exception:
+                pass
+            failed += 1
+            errors.append(str(exc))
+
+    await update_last_run(rule_id)
+    return {"sent": sent, "failed": failed, "errors": errors}

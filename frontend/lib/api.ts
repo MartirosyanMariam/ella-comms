@@ -123,6 +123,8 @@ export const api = {
     }),
   simulateRule: (id: string) =>
     request<SimulateResult>(`/rules/${id}/simulate`, { method: "POST" }),
+  triggerRule: (id: string) =>
+    request<{ sent: number; failed: number; errors: string[] }>(`/rules/${id}/trigger`, { method: "POST" }),
   getLogs: (params: LogParams) => {
     const q = new URLSearchParams();
     if (params.rule_id) q.set("rule_id", params.rule_id);
