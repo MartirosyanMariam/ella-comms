@@ -1,28 +1,23 @@
 "use client";
 import { useState } from "react";
-import { Trash2, Plus, AlertTriangle, CheckCircle } from "lucide-react";
+import { Trash2, Plus, X, AlertTriangle, CheckCircle, Code2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CONDITION_FIELDS, CONDITION_OPERATORS, api, type Condition } from "@/lib/api";
 
 interface Props {
-  conditionType: "standard" | "advanced";
-  conditionQuery: string;
   conditions: Condition[];
-  onChange: (updates: {
-    conditionType?: "standard" | "advanced";
-    conditionQuery?: string;
-    conditions?: Condition[];
-  }) => void;
+  conditionQuery: string | null;
+  onChange: (updates: { conditions?: Condition[]; conditionQuery?: string | null }) => void;
 }
 
-export function ConditionBuilder({ conditionType, conditionQuery, conditions, onChange }: Props) {
+export function ConditionBuilder({ conditions, conditionQuery, onChange }: Props) {
   const [testResult, setTestResult] = useState<{ count: number; error: string | null } | null>(null);
   const [testing, setTesting] = useState(false);
+
+  const hasAdvanced = conditionQuery !== null;
 
   function addCondition() {
     onChange({ conditions: [...conditions, { field: "target_language", operator: "eq", value: "" }] });
@@ -36,8 +31,18 @@ export function ConditionBuilder({ conditionType, conditionQuery, conditions, on
     onChange({ conditions: conditions.filter((_, i) => i !== index) });
   }
 
+  function addAdvanced() {
+    onChange({ conditionQuery: "" });
+    setTestResult(null);
+  }
+
+  function removeAdvanced() {
+    onChange({ conditionQuery: null });
+    setTestResult(null);
+  }
+
   async function handleTest() {
-    if (!conditionQuery.trim()) return;
+    if (!conditionQuery?.trim()) return;
     setTesting(true);
     try {
       const result = await api.testConditionQuery(conditionQuery);
@@ -49,112 +54,97 @@ export function ConditionBuilder({ conditionType, conditionQuery, conditions, on
     }
   }
 
+  const isEmpty = conditions.length === 0 && !hasAdvanced;
+
   return (
-    <div className="space-y-4">
-      {/* Mode toggle */}
-      <div className="flex items-center gap-3">
-        <Switch
-          id="condition-advanced"
-          checked={conditionType === "advanced"}
-          onCheckedChange={(checked) => {
-            onChange({ conditionType: checked ? "advanced" : "standard" });
-            setTestResult(null);
-          }}
-        />
-        <Label htmlFor="condition-advanced" className="cursor-pointer">
-          Advanced mode (custom SQL WHERE clause)
-        </Label>
-      </div>
+    <div className="space-y-3">
+      {isEmpty && (
+        <p className="text-sm text-muted-foreground">
+          No conditions — rule applies to all matched users.
+        </p>
+      )}
 
-      {conditionType === "standard" ? (
-        /* ── Standard row-based builder ── */
-        <div className="space-y-3">
-          {conditions.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No conditions — rule applies to all matched users.
-            </p>
-          )}
-          {conditions.map((cond, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Select value={cond.field} onValueChange={(v) => updateCondition(i, { field: v })}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONDITION_FIELDS.map((f) => (
-                    <SelectItem key={f.value} value={f.value}>
-                      {f.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Standard condition rows */}
+      {conditions.map((cond, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <Select value={cond.field} onValueChange={(v) => updateCondition(i, { field: v })}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CONDITION_FIELDS.map((f) => (
+                <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-              <Select
-                value={cond.operator}
-                onValueChange={(v) => updateCondition(i, { operator: v as Condition["operator"] })}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONDITION_OPERATORS.map((op) => (
-                    <SelectItem key={op.value} value={op.value}>
-                      {op.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Input
-                value={cond.value}
-                onChange={(e) => updateCondition(i, { value: e.target.value })}
-                placeholder="value"
-                className="flex-1"
-              />
-
-              <Button type="button" variant="ghost" size="icon" onClick={() => removeCondition(i)}>
-                <Trash2 className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            onClick={addCondition}
-            className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+          <Select
+            value={cond.operator}
+            onValueChange={(v) => updateCondition(i, { operator: v as Condition["operator"] })}
           >
-            <Plus className="h-3.5 w-3.5" />
-            Add condition
-          </button>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CONDITION_OPERATORS.map((op) => (
+                <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Input
+            value={cond.value}
+            onChange={(e) => updateCondition(i, { value: e.target.value })}
+            placeholder="value"
+            className="flex-1"
+          />
+
+          <Button type="button" variant="ghost" size="icon" onClick={() => removeCondition(i)}>
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
+          </Button>
         </div>
-      ) : (
-        /* ── Advanced SQL WHERE clause ── */
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Write a SQL <code className="bg-muted px-1 rounded">WHERE</code> clause that filters users from Ella's DB.
-            Reference the <code className="bg-muted px-1 rounded">users</code> table as{" "}
-            <code className="bg-muted px-1 rounded">u</code>. The clause is applied on top of the trigger result.
-          </p>
-          <div className="rounded-md bg-muted/40 border px-3 py-2 text-xs font-mono text-muted-foreground">
-            SELECT u.id FROM users u WHERE u.id = ANY(trigger_results) AND{" "}
-            <span className="text-foreground font-semibold">{"{ your clause }"}</span>
+      ))}
+
+      {/* Advanced SQL condition block */}
+      {hasAdvanced && (
+        <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Code2 className="h-4 w-4 text-primary" />
+              Advanced SQL condition
+            </div>
+            <Button type="button" variant="ghost" size="icon" onClick={removeAdvanced} className="h-7 w-7">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </Button>
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            A SQL <code className="bg-muted px-1 rounded">WHERE</code> clause applied on top of the conditions above.
+            Reference the <code className="bg-muted px-1 rounded">users</code> table as{" "}
+            <code className="bg-muted px-1 rounded">u</code>.
+          </p>
+
+          <div className="rounded bg-muted px-3 py-2 text-xs font-mono text-muted-foreground leading-relaxed">
+            {"... AND ("}<span className="text-foreground font-semibold">your clause</span>{")"}
+          </div>
+
           <Textarea
-            value={conditionQuery}
+            value={conditionQuery ?? ""}
             onChange={(e) => {
               onChange({ conditionQuery: e.target.value });
               setTestResult(null);
             }}
             placeholder={`u.target_language = 'French' AND u.country != 'US'`}
-            className="font-mono text-sm min-h-[100px]"
+            className="font-mono text-sm min-h-[80px]"
           />
+
           <div className="flex items-center gap-3">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleTest}
-              disabled={testing || !conditionQuery.trim()}
+              disabled={testing || !conditionQuery?.trim()}
             >
               {testing ? "Testing…" : "Test clause"}
             </Button>
@@ -181,6 +171,28 @@ export function ConditionBuilder({ conditionType, conditionQuery, conditions, on
           </div>
         </div>
       )}
+
+      {/* Add links */}
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          onClick={addCondition}
+          className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add condition
+        </button>
+        {!hasAdvanced && (
+          <button
+            type="button"
+            onClick={addAdvanced}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            <Code2 className="h-3.5 w-3.5" />
+            Add advanced condition
+          </button>
+        )}
+      </div>
     </div>
   );
 }

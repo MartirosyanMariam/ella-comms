@@ -22,7 +22,6 @@ export interface Rule {
   trigger_type: "standard" | "advanced";
   trigger_event?: string | null;
   trigger_query?: string | null;
-  condition_type: "standard" | "advanced";
   condition_query?: string | null;
   conditions: Condition[];
   delay_days: number;

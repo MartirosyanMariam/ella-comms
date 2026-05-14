@@ -131,10 +131,8 @@ async def evaluate(rule: Rule) -> AsyncIterator[tuple[str, ChannelContent]]:
 
     logger.info("rule %s: %d candidates from trigger", rule.id, len(candidate_ids))
 
-    # 3. Apply conditions
-    if getattr(rule, "condition_type", "standard") == "advanced" and getattr(rule, "condition_query", None):
-        filtered_ids = await _apply_advanced_condition(candidate_ids, rule.condition_query)
-    elif rule.conditions:
+    # 3. Apply standard conditions
+    if rule.conditions:
         filtered_ids = []
         for user_id in candidate_ids:
             if await _passes_conditions(user_id, rule.conditions):
@@ -142,9 +140,13 @@ async def evaluate(rule: Rule) -> AsyncIterator[tuple[str, ChannelContent]]:
     else:
         filtered_ids = candidate_ids
 
+    # 4. Apply advanced SQL condition on top if present
+    if getattr(rule, "condition_query", None):
+        filtered_ids = await _apply_advanced_condition(filtered_ids, rule.condition_query)
+
     logger.info("rule %s: %d after conditions", rule.id, len(filtered_ids))
 
-    # 4. Active channels
+    # 5. Active channels
     active_channels = [ch for ch in rule.channels]
 
     # 5. Per-user, per-channel
