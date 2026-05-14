@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 import evaluator
+import simulator
 from db.rules_db import (
     create_rule,
     delete_rule,
@@ -66,4 +67,13 @@ async def test_query(body: TestQueryRequest):
 @router.post("/test-condition-query")
 async def test_condition_query(body: TestQueryRequest):
     result = await evaluator.test_condition_query(body.sql)
+    return result
+
+
+@router.post("/{rule_id}/simulate")
+async def simulate_rule(rule_id: UUID):
+    """Dry-run a rule: evaluate trigger + conditions + build payloads without sending."""
+    result = await simulator.simulate(rule_id)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
     return result

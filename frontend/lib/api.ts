@@ -34,6 +34,61 @@ export interface Rule {
 
 export type RuleCreate = Omit<Rule, "id" | "created_at" | "updated_at" | "last_run_at">;
 
+export interface SimulatePreviewItem {
+  learner_id: string;
+  learner_name: string;
+  channel: string;
+  payload: Record<string, unknown>;
+}
+
+export interface SimulateResult {
+  rule_id: string;
+  rule_name: string;
+  rule_status: string;
+  total_would_send: number;
+  unique_users_matched: number;
+  skipped_already_notified: number;
+  preview: SimulatePreviewItem[];
+  preview_capped_at: number;
+  errors: string[];
+}
+
+export interface LogItem {
+  id: string;
+  rule_id: string;
+  rule_name: string | null;
+  learner_id: string;
+  channel: string;
+  status: "sent" | "failed";
+  error_message: string | null;
+  sent_at: string;
+}
+
+export interface LogsResponse {
+  total: number;
+  offset: number;
+  limit: number;
+  items: LogItem[];
+}
+
+export interface LogsSummary {
+  total_sent: number;
+  total_failed: number;
+  sent_today: number;
+  failed_today: number;
+}
+
+export interface LogParams {
+  rule_id?: string;
+  channel?: string;
+  status?: string;
+  learner_id?: string;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+  offset?: number;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}/api/v1${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -66,6 +121,21 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ sql }),
     }),
+  simulateRule: (id: string) =>
+    request<SimulateResult>(`/rules/${id}/simulate`, { method: "POST" }),
+  getLogs: (params: LogParams) => {
+    const q = new URLSearchParams();
+    if (params.rule_id) q.set("rule_id", params.rule_id);
+    if (params.channel) q.set("channel", params.channel);
+    if (params.status) q.set("status", params.status);
+    if (params.learner_id) q.set("learner_id", params.learner_id);
+    if (params.date_from) q.set("date_from", params.date_from);
+    if (params.date_to) q.set("date_to", params.date_to);
+    if (params.limit) q.set("limit", String(params.limit));
+    if (params.offset) q.set("offset", String(params.offset));
+    return request<LogsResponse>(`/logs?${q.toString()}`);
+  },
+  getLogsSummary: () => request<LogsSummary>("/logs/summary"),
 };
 
 export const TRIGGER_EVENTS = [

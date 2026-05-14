@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from db.ella_db import close_ella_pool
 from db.rules_db import close_rules_pool, run_migrations
 from routers.rules import router as rules_router
+from routers.logs import router as logs_router
 from scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(
@@ -44,6 +45,7 @@ app.add_middleware(
 )
 
 app.include_router(rules_router, prefix="/api/v1")
+app.include_router(logs_router, prefix="/api/v1")
 
 
 @app.get("/health")

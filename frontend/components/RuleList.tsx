@@ -2,9 +2,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Pause, Play, Bell, Smartphone, Mail } from "lucide-react";
+import { Plus, Pencil, Trash2, Pause, Play, Bell, Smartphone, Mail, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SimulateDrawer } from "@/components/SimulateDrawer";
 import { api, type Rule, TRIGGER_EVENTS } from "@/lib/api";
 
 function StatusBadge({ status }: { status: Rule["status"] }) {
@@ -37,6 +38,7 @@ export function RuleList() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [simulatingRule, setSimulatingRule] = useState<Rule | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -139,6 +141,14 @@ export function RuleList() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => setSimulatingRule(rule)}
+                        title="Dry Run"
+                      >
+                        <FlaskConical className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => router.push(`/rules/${rule.id}`)}
                         title="Edit"
                       >
@@ -174,6 +184,14 @@ export function RuleList() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {simulatingRule && (
+        <SimulateDrawer
+          rule={simulatingRule}
+          open={!!simulatingRule}
+          onClose={() => setSimulatingRule(null)}
+        />
       )}
     </div>
   );
