@@ -1,0 +1,90 @@
+services:
+  # ── Databases ────────────────────────────────────────────────────────────────
+
+  ella-mock-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ella_db
+      POSTGRES_USER: ella_user
+      POSTGRES_PASSWORD: ella_pass
+    volumes:
+      - ella-mock-db-data:/var/lib/postgresql/data
+      - ./service/db/seed_ella_db.sql:/docker-entrypoint-initdb.d/seed.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ella_user -d ella_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rules-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ella_comms_db
+      POSTGRES_USER: rules_user
+      POSTGRES_PASSWORD: rules_pass
+    volumes:
+      - rules-db-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rules_user -d ella_comms_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Mock backend (Ella's notification endpoint) ──────────────────────────────
+
+  mock-backend:
+    build:
+      context: ./mock-backend
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      PORT: 9000
+
+  # ── Notification service ─────────────────────────────────────────────────────
+
+  service:
+    build:
+      context: ./service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      ELLA_DB_URL: ${ELLA_DB_URL}
+      RULES_DB_URL: ${RULES_DB_URL}
+      BACKEND_API_URL: ${BACKEND_API_URL}
+      SCHEDULER_INTERVAL_MINUTES: ${SCHEDULER_INTERVAL_MINUTES}
+    depends_on:
+      ella-mock-db:
+        condition: service_healthy
+      rules-db:
+        condition: service_healthy
+      mock-backend:
+        condition: service_started
+    volumes:
+      - ./service:/app
+
+  # ── Admin UI ─────────────────────────────────────────────────────────────────
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - service
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  ella-mock-db-data:
+  rules-db-data:

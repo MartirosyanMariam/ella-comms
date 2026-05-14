@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EllaNotificationPayload",
+  "description": "Canonical payload sent from the Ella Communication Engine to Ella's backend notification endpoint.",
+  "type": "object",
+  "required": ["rule_id", "learner_id", "channel", "triggered_at", "scheduled_for", "content", "metadata"],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUID of the rule that triggered this notification."
+    },
+    "learner_id": {
+      "type": "string",
+      "description": "UUID or external identifier of the learner receiving the notification."
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["in_app", "push", "email"],
+      "description": "Delivery channel."
+    },
+    "triggered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp when the rule evaluation matched this learner."
+    },
+    "scheduled_for": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp when the notification should be delivered (triggered_at + delay_days)."
+    },
+    "content": {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "subject": { "type": ["string", "null"] },
+        "cta_label": { "type": ["string", "null"] },
+        "cta_url": { "type": ["string", "null"] }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["rule_name", "trigger_event", "variables_resolved"],
+      "properties": {
+        "rule_name": { "type": "string" },
+        "trigger_event": { "type": "string" },
+        "variables_resolved": {
+          "type": "object",
+          "properties": {
+            "user_name": { "type": "string" },
+            "language": { "type": "string" },
+            "native_language": { "type": "string" },
+            "days_inactive": { "type": "string" },
+            "content_count": { "type": "string" },
+            "content_title": { "type": ["string", "null"] }
+          }
+        }
+      }
+    }
+  }
+}

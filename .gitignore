@@ -1,0 +1,21 @@
+# Env files with real secrets
+.env
+
+# Node
+node_modules/
+.next/
+.pnpm-store/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Docker
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
