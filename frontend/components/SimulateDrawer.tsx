@@ -217,7 +217,7 @@ export function SimulateDrawer({ rule, open, onClose }: Props) {
               <Button
                 size="sm"
                 onClick={sendNow}
-                disabled={sending || loading || result.unique_users_matched === 0}
+                disabled={sending || loading}
               >
                 {sending ? (
                   <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Sending…</>

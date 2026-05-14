@@ -31,12 +31,8 @@ async def simulate(rule_id: UUID) -> dict:
     errors: list[str] = []
 
     try:
-        async for user_id, channel_content in eval_module.evaluate(rule):
-            matched_users.append(user_id)
-
-        # Re-run evaluate but also collect skipped users separately
-        # by checking notification_log without dedup filter
         all_candidates = await _get_all_candidates(rule)
+        matched_users = list(set(all_candidates))
 
         for user_id in all_candidates:
             for ch in rule.channels:
@@ -61,12 +57,14 @@ async def simulate(rule_id: UUID) -> dict:
     except Exception as e:
         errors.append(str(e))
 
+    sendable = len(matched_users) - len(skipped_already_notified)
+
     return {
         "rule_id": str(rule_id),
         "rule_name": rule.name,
         "rule_status": rule.status,
-        "total_would_send": len(matched_users) * len(rule.channels),
-        "unique_users_matched": len(set(matched_users)),
+        "total_would_send": max(sendable, 0) * len(rule.channels),
+        "unique_users_matched": len(matched_users),
         "skipped_already_notified": len(skipped_already_notified),
         "preview": would_send,
         "preview_capped_at": MAX_PREVIEW,
