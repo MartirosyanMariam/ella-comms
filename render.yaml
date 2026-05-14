@@ -1,0 +1,62 @@
+databases:
+  - name: ella-mock-db
+    databaseName: ella_db
+    user: ella_user
+    plan: free
+
+  - name: rules-db
+    databaseName: ella_comms_db
+    user: rules_user
+    plan: free
+
+services:
+  - type: web
+    name: mock-backend
+    runtime: docker
+    dockerfilePath: ./mock-backend/Dockerfile
+    dockerContext: ./mock-backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 9000
+
+  - type: web
+    name: ella-comms-service
+    runtime: docker
+    dockerfilePath: ./service/Dockerfile
+    dockerContext: ./service
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ELLA_DB_URL
+        fromDatabase:
+          name: ella-mock-db
+          property: connectionString
+      - key: RULES_DB_URL
+        fromDatabase:
+          name: rules-db
+          property: connectionString
+      - key: BACKEND_API_URL
+        fromService:
+          name: mock-backend
+          type: web
+          property: host
+          envVarKey: BACKEND_API_URL
+      - key: SCHEDULER_INTERVAL_MINUTES
+        value: "15"
+
+  - type: web
+    name: ella-comms-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    healthCheckPath: /
+    buildArgs:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: ella-comms-service
+          type: web
+          property: host
+          envVarKey: NEXT_PUBLIC_API_URL
