@@ -2,10 +2,10 @@ import logging
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from db.ella_db import close_ella_pool
+import app_env
 from db.rules_db import close_rules_pool, run_migrations
 from routers.rules import router as rules_router
 from routers.logs import router as logs_router
@@ -27,7 +27,6 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("shutting down")
     stop_scheduler()
-    await close_ella_pool()
     await close_rules_pool()
 
 
@@ -45,6 +44,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def env_middleware(request: Request, call_next):
+    env = request.headers.get("X-App-Env", "")
+    token = app_env.set_env_token(env)
+    try:
+        return await call_next(request)
+    finally:
+        app_env.reset_token(token)
+
 app.include_router(rules_router, prefix="/api/v1")
 app.include_router(logs_router, prefix="/api/v1")
 app.include_router(saved_queries_router, prefix="/api/v1")
@@ -53,3 +62,8 @@ app.include_router(saved_queries_router, prefix="/api/v1")
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/v1/env")
+def get_env():
+    return {"env": app_env.get_env()}

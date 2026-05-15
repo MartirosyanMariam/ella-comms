@@ -8,6 +8,8 @@ import os
 
 import httpx
 
+import app_env
+import mixpanel_client
 from models.payload import NotificationPayload
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,14 @@ async def send(payload: NotificationPayload) -> tuple[bool, str | None]:
             logger.info(
                 "sent  rule=%s  learner=%s  channel=%s",
                 payload.rule_id, payload.learner_id, payload.channel,
+            )
+            env = app_env.get_env()
+            await mixpanel_client.track_notification(
+                user_id=payload.learner_id,
+                rule_name=payload.metadata.rule_name,
+                rule_id=payload.rule_id,
+                channel=payload.channel,
+                env=env,
             )
             return True, None
         else:

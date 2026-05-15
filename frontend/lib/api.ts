@@ -1,5 +1,8 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+let _env: "dev" | "prod" = "dev";
+export function setApiEnv(env: "dev" | "prod") { _env = env; }
+
 export interface Condition {
   field: string;
   operator: "eq" | "neq" | "gt" | "lt" | "gte" | "lte";
@@ -99,7 +102,11 @@ export interface SavedQuery {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}/api/v1${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-App-Env": _env,
+      ...(options?.headers as Record<string, string> ?? {}),
+    },
     ...options,
   });
   if (!res.ok) {
@@ -155,22 +162,23 @@ export const api = {
 };
 
 export const TRIGGER_EVENTS = [
-  { value: "user_signed_up", label: "User signs up" },
+  { value: "user_signed_up",        label: "User signs up (app_started)" },
   { value: "first_session_started", label: "User starts first session" },
-  { value: "library_viewed", label: "User views Library" },
-  { value: "start_learning_clicked", label: 'User clicks "Start Learning"' },
-  { value: "content_added", label: "User adds content" },
-  { value: "add_content_viewed", label: "User visits Add Content" },
-  { value: "user_inactive", label: "User has been inactive for N days" },
+  { value: "onboarding_completed",  label: "User completes onboarding" },
+  { value: "library_viewed",        label: "User views Library" },
+  { value: "start_learning_clicked",label: 'User clicks "Start Learning"' },
+  { value: "content_added",         label: 'User adds content ("Send to Ella")' },
+  { value: "add_content_viewed",    label: "User visits Add Content page" },
+  { value: "user_inactive",         label: "User has been inactive for N days" },
 ] as const;
 
 export const CONDITION_FIELDS = [
-  { value: "target_language", label: "Target language", type: "string" },
-  { value: "native_language", label: "Native language", type: "string" },
-  { value: "country", label: "Country", type: "string" },
-  { value: "content_count", label: "Content items imported", type: "number" },
-  { value: "days_since_signup", label: "Days since signup", type: "number" },
-  { value: "app_version", label: "App version", type: "string" },
+  { value: "target_language",  label: "Learning language (from Mixpanel)", type: "string" },
+  { value: "country",          label: "Country (ISO code, e.g. US, AM)",   type: "string" },
+  { value: "platform",         label: "Platform (iOS / Android / web)",    type: "string" },
+  { value: "days_inactive",    label: "Days inactive",                     type: "number" },
+  { value: "content_count",    label: "Content items opened",              type: "number" },
+  { value: "days_since_signup",label: "Days since first seen",             type: "number" },
 ] as const;
 
 export const CONDITION_OPERATORS = [

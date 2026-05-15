@@ -1,12 +1,13 @@
 """
 Builds the canonical NotificationPayload for a given user + channel.
-Variable resolution errors default to empty string — never crashes the payload.
+Variables are resolved from Mixpanel.  Any field that fails defaults to "".
 """
 
 import logging
 from datetime import datetime, timedelta, timezone
 
-from db.ella_db import ella_readonly_conn
+import app_env
+import mixpanel_client
 from models.payload import (
     NotificationContent,
     NotificationMetadata,
@@ -21,14 +22,9 @@ logger = logging.getLogger(__name__)
 async def build(rule: Rule, user_id: str, channel: ChannelContent) -> NotificationPayload:
     now = datetime.now(timezone.utc)
     scheduled_for = now + timedelta(days=rule.delay_days)
+    env = app_env.get_env()
 
-    vars_resolved = await _resolve_variables(user_id)
-
-    rendered_title = _render(channel.title, vars_resolved)
-    rendered_body = _render(channel.body, vars_resolved)
-    rendered_subject = _render(channel.subject, vars_resolved) if channel.subject else None
-    rendered_cta_label = _render(channel.cta_label, vars_resolved) if channel.cta_label else None
-    rendered_cta_url = _render(channel.cta_url, vars_resolved) if channel.cta_url else None
+    profile = await _resolve(user_id, env)
 
     return NotificationPayload(
         rule_id=str(rule.id),
@@ -37,75 +33,50 @@ async def build(rule: Rule, user_id: str, channel: ChannelContent) -> Notificati
         triggered_at=now,
         scheduled_for=scheduled_for,
         content=NotificationContent(
-            title=rendered_title,
-            body=rendered_body,
-            subject=rendered_subject,
-            cta_label=rendered_cta_label,
-            cta_url=rendered_cta_url,
+            title=_render(channel.title, profile),
+            body=_render(channel.body, profile),
+            subject=_render(channel.subject, profile) if channel.subject else None,
+            cta_label=_render(channel.cta_label, profile) if channel.cta_label else None,
+            cta_url=_render(channel.cta_url, profile) if channel.cta_url else None,
         ),
         metadata=NotificationMetadata(
             rule_name=rule.name,
             trigger_event=rule.trigger_event or rule.trigger_type,
-            variables_resolved=vars_resolved,
+            variables_resolved=VariablesResolved(
+                user_name=profile.get("user_name", ""),
+                language=profile.get("language", ""),
+                native_language=profile.get("native_language", ""),
+                days_inactive=profile.get("days_inactive", "0"),
+                content_count=profile.get("content_count", "0"),
+                content_title=profile.get("content_title"),
+            ),
         ),
     )
 
 
-async def _resolve_variables(user_id: str) -> VariablesResolved:
-    """Query Ella DB for user data. Any field that fails resolves to ""."""
-    vars_dict: dict = {
-        "user_name": "",
-        "language": "",
-        "native_language": "",
-        "days_inactive": "",
-        "content_count": "",
-        "content_title": None,
-    }
-
+async def _resolve(user_id: str, env: str) -> dict:
     try:
-        async with ella_readonly_conn() as conn:
-            row = await conn.fetchrow(
-                """
-                SELECT
-                    first_name,
-                    target_language,
-                    native_language,
-                    COALESCE(
-                        DATE_PART('day', NOW() - last_seen_at)::int::text,
-                        '0'
-                    ) AS days_inactive,
-                    (SELECT COUNT(*)::text FROM user_content uc WHERE uc.user_id = u.id) AS content_count,
-                    (SELECT title FROM user_content uc WHERE uc.user_id = u.id ORDER BY added_at DESC LIMIT 1) AS content_title
-                FROM users u
-                WHERE u.id = $1::uuid
-                """,
-                user_id,
-            )
-            if row:
-                vars_dict["user_name"] = row["first_name"] or ""
-                vars_dict["language"] = row["target_language"] or ""
-                vars_dict["native_language"] = row["native_language"] or ""
-                vars_dict["days_inactive"] = row["days_inactive"] or "0"
-                vars_dict["content_count"] = row["content_count"] or "0"
-                vars_dict["content_title"] = row["content_title"]
+        return await mixpanel_client.get_user_profile(user_id, env)
     except Exception as exc:
-        logger.error("variable resolution failed for user %s: %s", user_id, exc)
+        logger.error("variable resolution failed user=%s: %s", user_id, exc)
+        return {
+            "user_name": "", "language": "", "native_language": "",
+            "days_inactive": "0", "content_count": "0", "content_title": None,
+        }
 
-    return VariablesResolved(**vars_dict)
 
-
-def _render(template: str | None, vars_resolved: VariablesResolved) -> str:
+def _render(template: str | None, profile: dict) -> str:
     if not template:
         return ""
     mapping = {
-        "{{user_name}}": vars_resolved.user_name,
-        "{{language}}": vars_resolved.language,
-        "{{native_language}}": vars_resolved.native_language,
-        "{{days_inactive}}": vars_resolved.days_inactive,
-        "{{content_count}}": vars_resolved.content_count,
-        "{{content_title}}": vars_resolved.content_title or "",
+        "{{user_name}}":       profile.get("user_name") or "",
+        "{{language}}":        profile.get("language") or "",
+        "{{native_language}}": profile.get("native_language") or "",
+        "{{days_inactive}}":   profile.get("days_inactive") or "0",
+        "{{content_count}}":   profile.get("content_count") or "0",
+        "{{content_title}}":   profile.get("content_title") or "",
     }
     result = template
-    for placeholder, value in mapping.items():
-        result = result.replace(placeholder, value)
+    for k, v in mapping.items():
+        result = result.replace(k, v)
     return result

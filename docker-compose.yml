@@ -58,6 +58,7 @@ services:
       RULES_DB_URL: ${RULES_DB_URL}
       BACKEND_API_URL: ${BACKEND_API_URL}
       SCHEDULER_INTERVAL_MINUTES: ${SCHEDULER_INTERVAL_MINUTES}
+      APP_ENV: ${APP_ENV:-dev}
     depends_on:
       ella-mock-db:
         condition: service_healthy

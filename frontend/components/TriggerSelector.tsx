@@ -66,16 +66,17 @@ export function TriggerSelector({ triggerType, triggerEvent, triggerQuery, onCha
         </div>
       ) : (
         <div className="space-y-3">
-          <Label htmlFor="trigger-query">Custom SQL query</Label>
+          <Label htmlFor="trigger-query">Custom Mixpanel JQL query</Label>
           <p className="text-xs text-muted-foreground">
-            Must return a column named <code className="bg-muted px-1 rounded">user_id</code>. Runs read-only against Ella's DB.
+            Must be a <code className="bg-muted px-1 rounded">function main()</code> returning{" "}
+            <code className="bg-muted px-1 rounded">[{"{"}user_id: "uid"{"}"}]</code>. Runs read-only against Mixpanel.
           </p>
           <Textarea
             id="trigger-query"
             value={triggerQuery}
             onChange={(e) => onChange({ triggerQuery: e.target.value })}
-            placeholder="SELECT id::text AS user_id FROM users WHERE ..."
-            className="font-mono text-sm min-h-[120px]"
+            placeholder={`function main() {\n  var to = new Date().toISOString().split("T")[0];\n  return Events({from_date:"2024-01-01", to_date:to, event_selectors:[{event:"app_started"}]})\n    .filter(e => !!e.properties.user_id)\n    .groupBy([e => e.properties.user_id], () => true)\n    .map(r => ({user_id: r.key[0]}));\n}`}
+            className="font-mono text-sm min-h-[140px]"
           />
           <SavedQueryPicker
             type="trigger"
