@@ -89,6 +89,14 @@ export interface LogParams {
   offset?: number;
 }
 
+export interface SavedQuery {
+  id: string;
+  name: string;
+  type: "trigger" | "condition";
+  sql: string;
+  created_at: string;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}/api/v1${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -125,6 +133,12 @@ export const api = {
     request<SimulateResult>(`/rules/${id}/simulate`, { method: "POST" }),
   triggerRule: (id: string) =>
     request<{ sent: number; failed: number; errors: string[] }>(`/rules/${id}/trigger`, { method: "POST" }),
+  getSavedQueries: (type?: "trigger" | "condition") =>
+    request<SavedQuery[]>(`/saved-queries${type ? `?type=${type}` : ""}`),
+  createSavedQuery: (name: string, type: "trigger" | "condition", sql: string) =>
+    request<SavedQuery>("/saved-queries", { method: "POST", body: JSON.stringify({ name, type, sql }) }),
+  deleteSavedQuery: (id: string) =>
+    request<void>(`/saved-queries/${id}`, { method: "DELETE" }),
   getLogs: (params: LogParams) => {
     const q = new URLSearchParams();
     if (params.rule_id) q.set("rule_id", params.rule_id);

@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { TRIGGER_EVENTS, api } from "@/lib/api";
 import { AlertTriangle, CheckCircle } from "lucide-react";
+import { SavedQueryPicker } from "@/components/SavedQueryPicker";
 
 interface Props {
   triggerType: "standard" | "advanced";
@@ -76,6 +77,12 @@ export function TriggerSelector({ triggerType, triggerEvent, triggerQuery, onCha
             placeholder="SELECT id::text AS user_id FROM users WHERE ..."
             className="font-mono text-sm min-h-[120px]"
           />
+          <SavedQueryPicker
+            type="trigger"
+            currentSql={triggerQuery}
+            onLoad={(sql) => onChange({ triggerQuery: sql })}
+          />
+
           <div className="flex items-center gap-3">
             <Button type="button" variant="outline" size="sm" onClick={handleTest} disabled={testing || !triggerQuery.trim()}>
               {testing ? "Testing…" : "Test query"}

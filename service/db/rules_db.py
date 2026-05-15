@@ -38,6 +38,14 @@ CREATE TABLE IF NOT EXISTS notification_log (
 
 CREATE INDEX IF NOT EXISTS idx_notif_log_rule_learner
     ON notification_log (rule_id, learner_id);
+
+CREATE TABLE IF NOT EXISTS saved_queries (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT NOT NULL,
+    type       TEXT NOT NULL,
+    sql        TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
 
 
@@ -166,6 +174,37 @@ async def log_notification(
         """,
         rule_id, learner_id, channel, status, error_message,
     )
+
+
+# ── Saved queries ─────────────────────────────────────────────────────────────
+
+async def list_saved_queries(type_filter: Optional[str] = None) -> list[dict]:
+    pool = await get_rules_pool()
+    if type_filter:
+        rows = await pool.fetch(
+            "SELECT id, name, type, sql, created_at FROM saved_queries WHERE type = $1 ORDER BY name",
+            type_filter,
+        )
+    else:
+        rows = await pool.fetch(
+            "SELECT id, name, type, sql, created_at FROM saved_queries ORDER BY name"
+        )
+    return [dict(r, id=str(r["id"])) for r in rows]
+
+
+async def create_saved_query(name: str, type_: str, sql: str) -> dict:
+    pool = await get_rules_pool()
+    row = await pool.fetchrow(
+        "INSERT INTO saved_queries (name, type, sql) VALUES ($1, $2, $3) RETURNING id, name, type, sql, created_at",
+        name, type_, sql,
+    )
+    return dict(row, id=str(row["id"]))
+
+
+async def delete_saved_query(query_id: UUID) -> bool:
+    pool = await get_rules_pool()
+    result = await pool.execute("DELETE FROM saved_queries WHERE id = $1", query_id)
+    return result == "DELETE 1"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

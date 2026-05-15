@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CONDITION_FIELDS, CONDITION_OPERATORS, api, type Condition } from "@/lib/api";
+import { SavedQueryPicker } from "@/components/SavedQueryPicker";
 
 interface Props {
   conditions: Condition[];
@@ -136,6 +137,12 @@ export function ConditionBuilder({ conditions, conditionQuery, onChange }: Props
             }}
             placeholder={`u.target_language = 'French' AND u.country != 'US'`}
             className="font-mono text-sm min-h-[80px]"
+          />
+
+          <SavedQueryPicker
+            type="condition"
+            currentSql={conditionQuery ?? ""}
+            onLoad={(sql) => { onChange({ conditionQuery: sql }); setTestResult(null); }}
           />
 
           <div className="flex items-center gap-3">
